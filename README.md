@@ -82,11 +82,25 @@
 2. **打包应用（优化版）**
 
     ```bash
-    pyinstaller --onedir --windowed \
+    pyinstaller --onedir --windowed --upx-dir=D:\_program\upx-5.0.2-win64 --noconfirm --noconsole --strip \
     --hidden-import PyQt5.QtCore \
     --hidden-import PyQt5.QtGui \
     --hidden-import PyQt5.QtWidgets \
     --hidden-import qfluentwidgets \
+    --hidden-import requests \
+    --hidden-import urllib3 \
+    --hidden-import chardet \
+    --hidden-import idna \
+    --hidden-import certifi \
+    --hidden-import _ssl \
+    --hidden-import ssl \
+    --hidden-import _hashlib \
+    --hidden-import _socket \
+    --hidden-import http.client \
+    --hidden-import urllib.request \
+    --hidden-import urllib.parse \
+    --hidden-import urllib.error \
+    --hidden-import _ctypes \
     --exclude-module torch \
     --exclude-module torchvision \
     --exclude-module torchaudio \
@@ -103,6 +117,8 @@
     --exclude-module google \
     asr_gui.py
     ```
+
+    **注意**：打包后，需要将 `libcrypto-3.dll` 和 `libssl-3.dll` 复制到生成的可执行文件所在目录的 `_internal` 子目录中。
 
     这个命令排除了常见的多余模块（如 torch、pandas、scipy 等），大幅减小打包大小。运行后检查 `dist/asr_gui/_internal` 目录，如果仍有不需要的模块，添加更多 `--exclude-module`。
 
