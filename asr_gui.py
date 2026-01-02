@@ -14,7 +14,7 @@ from PyQt5.QtCore import Qt, QRunnable, QThreadPool, QObject, pyqtSignal as Sign
     pyqtSignal
 from PyQt5.QtGui import QCursor, QColor, QFont
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFileDialog,
-                             QTableWidgetItem, QHeaderView, QSizePolicy)
+                             QTableWidgetItem, QHeaderView, QSizePolicy, QTextEdit)
 from qfluentwidgets import (ComboBox, PushButton, LineEdit, TableWidget, FluentIcon as FIF,
                             Action, RoundMenu, InfoBar, InfoBarPosition,
                             FluentWindow, BodyLabel, MessageBox)
@@ -132,6 +132,7 @@ class ASRWidget(QWidget):
         self.thread_pool.setMaxThreadCount(self.max_threads)
         self.processing_queue = []
         self.workers = {}  # 维护文件路径到worker的映射
+        self.all_done_shown = False
 
 
     def init_ui(self):
@@ -184,10 +185,15 @@ class ASRWidget(QWidget):
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # 处理按钮
+        button_layout = QHBoxLayout()
         self.process_button = PushButton("开始处理", self)
         self.process_button.clicked.connect(self.process_files)
         self.process_button.setEnabled(False)  # 初始禁用
-        layout.addWidget(self.process_button)
+        button_layout.addWidget(self.process_button)
+        self.clear_btn = PushButton("清理已完成", self)
+        self.clear_btn.clicked.connect(self.clear_success_tasks)
+        button_layout.addWidget(self.clear_btn)
+        layout.addLayout(button_layout)
 
         self.setAcceptDrops(True)
 
@@ -197,6 +203,7 @@ class ASRWidget(QWidget):
                                                 "Media Files (*.mp3 *.wav *.ogg *.mp4 *.avi *.mov *.ts)")
         for file in files:
             self.add_file_to_table(file)
+        self.all_done_shown = False
         self.update_start_button_state()
 
     def add_file_to_table(self, file_path):
@@ -314,9 +321,9 @@ class ASRWidget(QWidget):
         self.process_next_in_queue()
 
     def process_files(self):
-        """处理所有未处理的文件"""
+        """处理所有未处理或出错的文件"""
         for row in range(self.table.rowCount()):
-            if self.table.item(row, 1).text() == "未处理":
+            if self.table.item(row, 1).text() in ["未处理", "错误"]:
                 file_path = self.table.item(row, 0).data(Qt.UserRole)
                 self.processing_queue.append(file_path)
         self.process_next_in_queue()
@@ -332,6 +339,19 @@ class ASRWidget(QWidget):
         """处理单个文件"""
         selected_engine = self.combo_box.currentText()
         selected_format = self.format_combo.currentText()
+        # 检查输出文件是否存在 (根据选择的格式)
+        save_ext = selected_format.lower()
+        base_name = os.path.splitext(file_path)[0]
+        output_path = base_name + "." + save_ext
+        if os.path.exists(output_path):
+            row = self.find_row_by_file_path(file_path)
+            if row != -1:
+                status_item = self.create_non_editable_item("已存在")
+                status_item.setForeground(QColor("blue"))
+                self.table.setItem(row, 1, status_item)
+            self.update_start_button_state()
+            return
+        
         worker = ASRWorker(file_path, selected_engine, selected_format)
         worker.signals.finished.connect(self.update_table)
         worker.signals.errno.connect(self.handle_error)
@@ -399,11 +419,24 @@ class ASRWidget(QWidget):
 
     def update_start_button_state(self):
         """根据文件列表更新开始处理按钮的状态"""
-        has_unprocessed = any(
-            self.table.item(row, 1).text() == "未处理"
+        has_pending = any(
+            self.table.item(row, 1).text() in ["未处理", "错误"]
             for row in range(self.table.rowCount())
         )
-        self.process_button.setEnabled(has_unprocessed)
+        self.process_button.setEnabled(has_pending)
+        
+        # 如果没有待处理的任务，且表格不为空，且未显示过完成通知，则显示
+        if not has_pending and self.table.rowCount() > 0 and not self.all_done_shown:
+            InfoBar.success(
+                title='处理完毕',
+                content="全部任务处理完毕",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=0,  # 不自动消失
+                parent=self
+            )
+            self.all_done_shown = True
 
     def dragEnterEvent(self, event):
         """拖拽进入事件"""
@@ -425,6 +458,41 @@ class ASRWidget(QWidget):
                             self.add_file_to_table(os.path.join(root, f))
             elif file.lower().endswith(supported_formats):
                 self.add_file_to_table(file)
+        self.all_done_shown = False
+        self.update_start_button_state()
+
+    def clear_success_tasks(self):
+        """倒序遍历列表，删除包含'成功'或'完成'状态的条目"""
+        # 注意：这里假设您的列表控件名为 self.table，请根据实际代码调整变量名
+        # 如果源码中使用的是 TableWidget:
+        row_count = self.table.rowCount()
+        removed_count = 0
+        for i in range(row_count - 1, -1, -1):  # 倒序删除防止索引错位
+            status_item = self.table.item(i, 1)
+            if status_item and status_item.text() in ["已处理", "已存在"]:
+                self.table.removeRow(i)
+                removed_count += 1
+        
+        if removed_count > 0:
+            InfoBar.success(
+                title='清理完成',
+                content=f"已清理 {removed_count} 个已完成/跳过任务",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        else:
+            InfoBar.info(
+                title='无任务可清理',
+                content="没有找到已完成的成功任务",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
         self.update_start_button_state()
 
 
@@ -468,6 +536,35 @@ class InfoWidget(QWidget):
         main_layout.addWidget(github_button)
 
 
+class QTextEditHandler(logging.Handler):
+    """自定义日志处理器，将日志输出到 QTextEdit"""
+    def __init__(self, text_edit):
+        super().__init__()
+        self.text_edit = text_edit
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.text_edit.append(msg)
+
+
+class LogWidget(QWidget):
+    """日志显示界面"""
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        layout.addWidget(self.log_text)
+
+        # 添加日志处理器
+        handler = QTextEditHandler(self.log_text)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logging.getLogger().addHandler(handler)
+
+
 class MainWindow(FluentWindow):
     """主窗口"""
     def __init__(self):
@@ -483,6 +580,11 @@ class MainWindow(FluentWindow):
         self.info_widget = InfoWidget()
         self.info_widget.setObjectName("info")  # 设置对象名称
         self.addSubInterface(self.info_widget, FIF.GITHUB, 'About')
+
+        # 日志界面
+        self.log_widget = LogWidget()
+        self.log_widget.setObjectName("log")
+        self.addSubInterface(self.log_widget, FIF.LOG, 'LOG')
 
         self.navigationInterface.setExpandWidth(200)
         self.resize(800, 600)
