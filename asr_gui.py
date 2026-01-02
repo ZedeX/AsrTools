@@ -23,6 +23,10 @@ from bk_asr.BcutASR import BcutASR
 from bk_asr.JianYingASR import JianYingASR
 from bk_asr.KuaiShouASR import KuaiShouASR
 
+# 让 PyInstaller 检测到LOG属性
+from qfluentwidgets import FluentIcon
+# _ = FluentIcon.LOG  # 移除，因为 FluentIcon 没有 LOG 属性  
+
 # 设置日志配置
 logging.basicConfig(
     level=logging.INFO,
@@ -584,7 +588,7 @@ class MainWindow(FluentWindow):
         # 日志界面
         self.log_widget = LogWidget()
         self.log_widget.setObjectName("log")
-        self.addSubInterface(self.log_widget, FIF.LOG, 'LOG')
+        self.addSubInterface(self.log_widget, FIF.INFO, 'LOG')
 
         self.navigationInterface.setExpandWidth(200)
         self.resize(800, 600)

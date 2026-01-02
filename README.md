@@ -79,15 +79,32 @@
     pip install pyinstaller
     ```
 
-2. **打包应用**
+2. **打包应用（优化版）**
 
     ```bash
-    pyinstaller --onedir --windowed --hidden-import PyQt5.QtCore --hidden-import PyQt5.QtGui --hidden-import PyQt5.QtWidgets --hidden-import qfluentwidgets asr_gui.py
+    pyinstaller --onedir --windowed \
+    --hidden-import PyQt5.QtCore \
+    --hidden-import PyQt5.QtGui \
+    --hidden-import PyQt5.QtWidgets \
+    --hidden-import qfluentwidgets \
+    --exclude-module torch \
+    --exclude-module torchvision \
+    --exclude-module torchaudio \
+    --exclude-module pandas \
+    --exclude-module scipy \
+    --exclude-module yaml \
+    --exclude-module setuptools \
+    --exclude-module pywin32 \
+    --exclude-module Pythonwin \
+    --exclude-module markupsafe \
+    --exclude-module PIL \
+    --exclude-module dateutil \
+    --exclude-module pytz \
+    --exclude-module google \
+    asr_gui.py
     ```
 
-    - `--onedir`：生成目录而不是单个文件，便于添加额外文件。
-    - `--windowed`：隐藏控制台窗口（适用于 GUI 应用）。
-    - `--hidden-import`：确保 PyQt5 和 qfluentwidgets 的模块被包含。
+    这个命令排除了常见的多余模块（如 torch、pandas、scipy 等），大幅减小打包大小。运行后检查 `dist/asr_gui/_internal` 目录，如果仍有不需要的模块，添加更多 `--exclude-module`。
 
 3. **添加 ffmpeg**
 
@@ -105,11 +122,6 @@
 - 使用 `--onedir` 生成的目录大小通常小于 `--onefile`，便于管理。
 - 确保 ffmpeg 版本兼容（推荐最新稳定版）。
 - 如果仍有问题，检查 exe 运行时的错误日志。
-
-**优化打包大小**：
-- 安装 UPX 并添加 `--upx-dir /path/to/upx` 以压缩可执行文件。
-- 排除不必要的模块：添加 `--exclude-module` 参数排除如 `tkinter` 等未使用的模块。
-- 使用虚拟环境，仅打包项目依赖，避免包含全局 Python 库。
 
 ---
 
