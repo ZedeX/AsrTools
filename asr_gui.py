@@ -6,7 +6,7 @@ import subprocess
 import sys
 import webbrowser
 
-# FIX: 修复中文路径报错 https://github.com/WEIFENG2333/AsrTools/issues/18  设置QT_QPA_PLATFORM_PLUGIN_PATH 
+# FIX: 修复中文路径报错 https://github.com/WEIFENG2333/AsrTools/issues/18  设置QT_QPA_PLATFORM_PLUGIN_PATH
 plugin_path = os.path.join(sys.prefix, 'Lib', 'site-packages', 'PyQt5', 'Qt5', 'plugins')
 os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plugin_path
 
@@ -14,7 +14,7 @@ from PyQt5.QtCore import Qt, QRunnable, QThreadPool, QObject, pyqtSignal as Sign
     pyqtSignal
 from PyQt5.QtGui import QCursor, QColor, QFont
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFileDialog,
-                             QTableWidgetItem, QHeaderView, QSizePolicy, QTextEdit)
+                             QTableWidgetItem, QHeaderView, QSizePolicy, QTextEdit, QDialog, QProgressBar, QPushButton, QLabel, QMessageBox)
 from qfluentwidgets import (ComboBox, PushButton, LineEdit, TableWidget, FluentIcon as FIF,
                             Action, RoundMenu, InfoBar, InfoBarPosition,
                             FluentWindow, BodyLabel, MessageBox)
@@ -23,9 +23,11 @@ from bk_asr.BcutASR import BcutASR
 from bk_asr.JianYingASR import JianYingASR
 from bk_asr.KuaiShouASR import KuaiShouASR
 
+from ffmpeg_manager import get_ffmpeg_manager, FFmpegManager, get_ffmpeg_path
+
 # 让 PyInstaller 检测到LOG属性
 from qfluentwidgets import FluentIcon
-# _ = FluentIcon.LOG  # 移除，因为 FluentIcon 没有 LOG 属性  
+# _ = FluentIcon.LOG  # 移除，因为 FluentIcon 没有 LOG 属性
 
 # 设置日志配置
 logging.basicConfig(
@@ -54,7 +56,7 @@ class ASRWorker(QRunnable):
     def run(self):
         try:
             use_cache = True
-            
+
             # 检查文件类型,如果不是音频则转换
             logging.info("[+]正在进ffmpeg转换")
             audio_exts = ['.mp3', '.wav']
@@ -65,7 +67,7 @@ class ASRWorker(QRunnable):
                 self.audio_path = temp_audio
             else:
                 self.audio_path = self.file_path
-            
+
             # 根据选择的 ASR 引擎实例化相应的类
             if self.asr_engine == 'B 接口':
                 asr = BcutASR(self.audio_path, use_cache=use_cache)
@@ -82,7 +84,7 @@ class ASRWorker(QRunnable):
 
             logging.info(f"开始处理文件: {self.file_path} 使用引擎: {self.asr_engine}")
             result = asr.run()
-            
+
             # 根据导出格式选择转换方法
             save_ext = self.export_format.lower()
             if save_ext == 'srt':
@@ -91,7 +93,7 @@ class ASRWorker(QRunnable):
                 result_text = result.to_ass()
             elif save_ext == 'txt':
                 result_text = result.to_txt()
-                
+
             logging.info(f"完成处理文件: {self.file_path} 使用引擎: {self.asr_engine}")
             save_path = self.file_path.rsplit(".", 1)[0] + "." + save_ext
             with open(save_path, "w", encoding="utf-8") as f:
@@ -100,6 +102,7 @@ class ASRWorker(QRunnable):
         except Exception as e:
             logging.error(f"处理文件 {self.file_path} 时出错: {str(e)}")
             self.signals.errno.emit(self.file_path, f"处理时出错: {str(e)}")
+
 
 class UpdateCheckerThread(QThread):
     msg = pyqtSignal(str, str, str)  # 用于发送消息的信号
@@ -123,6 +126,92 @@ class UpdateCheckerThread(QThread):
                     self.msg.emit("可更新", "检测到新版本，请下载最新版本。", config['update_download_url'])
         except Exception as e:
             pass
+
+
+class FFmpegDownloadThread(QThread):
+    """FFmpeg 下载线程"""
+    progress_updated = pyqtSignal(int)
+    status_updated = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)
+
+    def __init__(self, ffmpeg_manager: FFmpegManager, parent=None):
+        super().__init__(parent)
+        self.ffmpeg_manager = ffmpeg_manager
+
+    def run(self):
+        try:
+            success = self.ffmpeg_manager.download_ffmpeg(
+                progress_callback=self.progress_updated.emit,
+                status_callback=self.status_updated.emit
+            )
+            self.finished.emit(success, "下载完成" if success else "下载失败")
+        except Exception as e:
+            self.finished.emit(False, str(e))
+
+
+class FFmpegDownloadDialog(QDialog):
+    """FFmpeg 下载对话框"""
+
+    def __init__(self, ffmpeg_manager: FFmpegManager, parent=None):
+        super().__init__(parent)
+        self.ffmpeg_manager = ffmpeg_manager
+        self.success = False
+        self._init_ui()
+        self._start_download()
+
+    def _init_ui(self):
+        self.setWindowTitle("正在下载 FFmpeg")
+        self.setFixedSize(450, 180)
+        layout = QVBoxLayout(self)
+
+        self.info_label = QLabel(
+            "视频转换需要 FFmpeg，正在自动下载...\n"
+            "下载源：GitHub (BtbN/FFmpeg-Builds)",
+            self
+        )
+        self.info_label.setWordWrap(True)
+        layout.addWidget(self.info_label)
+
+        self.status_label = QLabel("准备中...", self)
+        layout.addWidget(self.status_label)
+
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        layout.addWidget(self.progress_bar)
+
+        self.cancel_button = QPushButton("取消", self)
+        self.cancel_button.clicked.connect(self.reject)
+        layout.addWidget(self.cancel_button)
+
+    def _start_download(self):
+        self.download_thread = FFmpegDownloadThread(self.ffmpeg_manager, self)
+        self.download_thread.progress_updated.connect(self.progress_bar.setValue)
+        self.download_thread.status_updated.connect(self.status_label.setText)
+        self.download_thread.finished.connect(self._on_finished)
+        self.download_thread.start()
+
+    def _on_finished(self, success: bool, message: str):
+        self.success = success
+        if success:
+            InfoBar.success(
+                title='下载完成',
+                content='FFmpeg 已准备就绪',
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self.parent() if self.parent() else self
+            )
+            self.accept()
+        else:
+            QMessageBox.critical(
+                self,
+                "下载失败",
+                f"FFmpeg 下载失败：{message}\n\n"
+                "请手动下载 ffmpeg.exe 并放置到程序目录，\n"
+                "或从 https://github.com/BtbN/FFmpeg-Builds/releases 下载。"
+            )
+            self.reject()
 
 
 class ASRWidget(QWidget):
@@ -152,7 +241,7 @@ class ASRWidget(QWidget):
         engine_layout.addWidget(self.combo_box)
         layout.addLayout(engine_layout)
 
-        # 导出格式选择区域 
+        # 导出格式选择区域
         format_layout = QHBoxLayout()
         format_label = BodyLabel("导出格式:", self)
         format_label.setFixedWidth(70)
@@ -341,6 +430,23 @@ class ASRWidget(QWidget):
 
     def process_file(self, file_path):
         """处理单个文件"""
+        # 检查是否需要转换视频，如果需要则先确保 FFmpeg 可用
+        audio_exts = ['.mp3', '.wav']
+        needs_ffmpeg = not any(file_path.lower().endswith(ext) for ext in audio_exts)
+
+        if needs_ffmpeg:
+            # 获取主窗口
+            main_window = self.window()
+            if hasattr(main_window, 'ensure_ffmpeg'):
+                if not main_window.ensure_ffmpeg():
+                    # 用户取消或下载失败
+                    row = self.find_row_by_file_path(file_path)
+                    if row != -1:
+                        item_status = self.create_non_editable_item("需要 FFmpeg")
+                        item_status.setForeground(QColor("orange"))
+                        self.table.setItem(row, 1, item_status)
+                    return
+
         selected_engine = self.combo_box.currentText()
         selected_format = self.format_combo.currentText()
         # 检查输出文件是否存在 (根据选择的格式)
@@ -355,7 +461,7 @@ class ASRWidget(QWidget):
                 self.table.setItem(row, 1, status_item)
             self.update_start_button_state()
             return
-        
+
         worker = ASRWorker(file_path, selected_engine, selected_format)
         worker.signals.finished.connect(self.update_table)
         worker.signals.errno.connect(self.handle_error)
@@ -428,7 +534,7 @@ class ASRWidget(QWidget):
             for row in range(self.table.rowCount())
         )
         self.process_button.setEnabled(has_pending)
-        
+
         # 如果没有待处理的任务，且表格不为空，且未显示过完成通知，则显示
         if not has_pending and self.table.rowCount() > 0 and not self.all_done_shown:
             InfoBar.success(
@@ -476,7 +582,7 @@ class ASRWidget(QWidget):
             if status_item and status_item.text() in ["已处理", "已存在"]:
                 self.table.removeRow(i)
                 removed_count += 1
-        
+
         if removed_count > 0:
             InfoBar.success(
                 title='清理完成',
@@ -516,13 +622,13 @@ class InfoWidget(QWidget):
     ⚡ 效率超人：多线程并发 + 批量处理，文字转换快如闪电。
     📄 多格式支持：支持生成 .srt 和 .txt 字幕文件，满足不同需求。
         """
-        
+
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignTop)
         # main_layout.setSpacing(50)
 
         # 标题
-        title_label = BodyLabel("  ASRTools", self)
+        title_label = BodyLabel("  ASRTools v1.3.0", self)
         title_label.setFont(QFont("Segoe UI", 30, QFont.Bold))
         title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
@@ -573,7 +679,7 @@ class MainWindow(FluentWindow):
     """主窗口"""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('ASR Processing Tool')
+        self.setWindowTitle('ASR Processing Tool v1.3.0')
 
         # ASR 处理界面
         self.asr_widget = ASRWidget()
@@ -597,12 +703,57 @@ class MainWindow(FluentWindow):
         self.update_checker.msg.connect(self.show_msg)
         self.update_checker.start()
 
+        # 检查 FFmpeg
+        self._check_ffmpeg_on_startup()
+
+    def _check_ffmpeg_on_startup(self):
+        """启动时检查 FFmpeg"""
+        ffmpeg_mgr = get_ffmpeg_manager()
+        if not ffmpeg_mgr.is_ffmpeg_available():
+            InfoBar.info(
+                title='提示',
+                content='首次使用视频转换功能时将自动下载 FFmpeg',
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=4000,
+                parent=self
+            )
+
+    def ensure_ffmpeg(self) -> bool:
+        """
+        确保 FFmpeg 可用，需要时下载
+
+        Returns:
+            bool: FFmpeg 是否可用
+        """
+        ffmpeg_mgr = get_ffmpeg_manager()
+        if ffmpeg_mgr.is_ffmpeg_available():
+            return True
+
+        reply = QMessageBox.question(
+            self,
+            "需要 FFmpeg",
+            "视频转换需要 FFmpeg，是否现在自动下载？\n\n"
+            "下载大小约 80-100MB，可能需要几分钟。\n\n"
+            "或者您可以手动下载 ffmpeg.exe 并放置到程序目录。",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+
+        if reply == QMessageBox.Yes:
+            dialog = FFmpegDownloadDialog(ffmpeg_mgr, self)
+            return dialog.exec_() == QDialog.Accepted
+
+        return False
+
     def show_msg(self, title, content, update_download_url):
         w = MessageBox(title, content, self)
         if w.exec() and update_download_url:
             webbrowser.open(update_download_url)
         if title == "更新":
             sys.exit(0)
+
 
 def video2audio(input_file: str, output: str = "") -> bool:
     """使用ffmpeg将视频转换为音频"""
@@ -611,8 +762,13 @@ def video2audio(input_file: str, output: str = "") -> bool:
     output.parent.mkdir(parents=True, exist_ok=True)
     output = str(output)
 
+    # 获取 ffmpeg 路径
+    ffmpeg_path = get_ffmpeg_path()
+    if not ffmpeg_path:
+        return False
+
     cmd = [
-        'ffmpeg',
+        ffmpeg_path,
         '-i', input_file,
         '-ac', '1',
         '-f', 'mp3',
@@ -620,12 +776,30 @@ def video2audio(input_file: str, output: str = "") -> bool:
         '-y',
         output
     ]
-    result = subprocess.run(cmd, capture_output=True, check=True, encoding='utf-8', errors='replace')
+
+    # 构建 subprocess.run 的参数字典
+    kwargs = {
+        'capture_output': True,
+        'check': True,
+        'encoding': 'utf-8',
+        'errors': 'replace'
+    }
+
+    # 在 Windows 上添加隐藏窗口的配置
+    if platform.system() == 'Windows':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startupinfo
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
+    result = subprocess.run(cmd, **kwargs)
 
     if result.returncode == 0 and Path(output).is_file():
         return True
     else:
         return False
+
 
 def start():
     # enable dpi scale
