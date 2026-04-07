@@ -3,6 +3,8 @@ name: Build Executables for Windows/Linux/macOS
 on:
   push:
     branches: [ main ]          # 当 main 分支有代码推送时触发
+    tags:
+      - 'v*'                   # 当推送 v* 标签时触发
   release:
     types: [created]            # 当创建 Release 时触发
 
@@ -74,18 +76,6 @@ jobs:
         pyinstaller --onedir --console --strip --hidden-import requests --hidden-import urllib3 --hidden-import chardet --hidden-import idna --hidden-import certifi --hidden-import _ssl --hidden-import ssl --hidden-import _hashlib --hidden-import _socket --hidden-import http.client --hidden-import urllib.request --hidden-import urllib.parse --hidden-import urllib.error --hidden-import _ctypes --exclude-module PyQt5 --exclude-module PyQt5.QtCore --exclude-module PyQt5.QtGui --exclude-module PyQt5.QtWidgets --exclude-module qfluentwidgets --exclude-module torch --exclude-module torchvision --exclude-module torchaudio --exclude-module pandas --exclude-module scipy --exclude-module yaml --exclude-module setuptools --exclude-module pywin32 --exclude-module Pythonwin --exclude-module markupsafe --exclude-module PIL --exclude-module dateutil --exclude-module pytz --exclude-module google --name asr_cli cli.py
         mv dist/asr_cli dist/asr_cli-macos
 
-    - name: Upload to Release
-      uses: softprops/action-gh-release@v2
-      if: github.event_name == 'release'
-      with:
-        files: |
-          dist/asr_gui-windows/*
-          dist/asr_gui-linux/*
-          dist/asr_gui-macos/*
-          dist/asr_cli-windows/*
-          dist/asr_cli-linux/*
-          dist/asr_cli-macos/*
-
     - name: Upload GUI as workflow artifact
       uses: actions/upload-artifact@v4
       with:
@@ -97,3 +87,31 @@ jobs:
       with:
         name: asr_cli-${{ matrix.os }}
         path: dist/asr_cli-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+
+    - name: Create ZIP packages
+      run: |
+        cd artifacts
+        for dir in */; do
+          zip -r "${dir%/}.zip" "$dir"
+        done
+        ls -la
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: artifacts/*.zip
+        generate_release_notes: true
