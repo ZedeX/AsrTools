@@ -102,7 +102,8 @@ AsrTools/
 │   ├── JianYingASR.py
 │   └── KuaiShouASR.py
 ├── asr_gui.spec        # PyInstaller GUI 配置
-└── asr_cli.spec        # PyInstaller CLI 配置
+├── asr_cli.spec        # PyInstaller CLI 配置
+└── .github/workflows/build.yml  # GitHub Actions 自动构建
 ```
 
 ## 构建
@@ -116,6 +117,77 @@ pyinstaller asr_gui.spec
 # CLI 版本
 pyinstaller asr_cli.spec
 ```
+
+## 版本发布流程
+
+### v1.3.x 完整更新记录
+
+#### v1.3.0 - FFmpeg 自动下载
+- 新增 `ffmpeg_manager.py` 模块
+- 自动检测系统 PATH 和程序目录中的 FFmpeg
+- 从 GitHub (BtbN/FFmpeg-Builds) 自动下载 FFmpeg
+- GUI 集成 FFmpeg 下载对话框
+- 首次使用视频转换时提示自动下载
+- FFMPEG 调用不弹出控制台窗口（Windows）
+
+#### v1.3.1 - 增强 CLI 和 Node.js 24 修复
+- 增强 CLI 工具：默认处理当前目录及其子目录
+- 默认引擎：JianYingASR (J)
+- 默认输出格式：TXT
+- 添加 `--no-recursive` 选项
+- 批量处理时自动跳过已存在文件
+- 修复 Node.js 20 弃用警告：使用 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`
+- 使用 Python 动态查找 SSL DLL 路径
+
+#### v1.3.2 - 自动创建 Release
+- GitHub Actions 支持 `v*` 标签推送触发
+- 新增 `release` job，自动下载 artifacts 并创建 ZIP
+- 使用 `softprops/action-gh-release` 自动创建 Release
+- 自动生成 Release Notes
+
+### 如何发布新版本
+
+只需以下几步即可自动构建和发布：
+
+```bash
+# 1. 创建带注释的标签
+git tag -a v1.x.x -m "Release v1.x.x - 版本说明"
+
+# 2. 推送标签到 GitHub
+git push origin v1.x.x
+```
+
+### GitHub Actions 自动流程
+
+推送 `v*` 标签后，GitHub Actions 会自动执行：
+
+1. **检测到标签推送**
+   - 触发条件：`refs/tags/v*`
+
+2. **构建阶段 (build job)**
+   - 在 Windows、Ubuntu、macOS 三个平台上并行构建
+   - 每个平台构建 GUI 和 CLI 两个版本
+   - 上传 artifacts（共 6 个：3 平台 × 2 版本）
+
+3. **发布阶段 (release job)**
+   - 等待所有构建完成
+   - 下载所有 artifacts
+   - 打包成 ZIP 文件
+   - 自动创建 GitHub Release
+   - 上传所有 ZIP 文件
+   - 自动生成 Release Notes
+
+### 手动创建 Release（备选方案）
+
+如果需要手动创建 Release：
+
+1. 访问：https://github.com/ZedeX/AsrTools/releases/new
+2. **Choose a tag**：选择已推送的标签（如 `v1.3.2`）
+3. **Release title**：输入版本号（如 `v1.3.2`）
+4. **Describe this release**：填写更新说明
+5. 点击 **Publish release**
+
+创建后，GitHub Actions 会自动将 artifacts 上传到该 Release。
 
 ## 许可证
 
