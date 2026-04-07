@@ -96,6 +96,7 @@ python cli.py ./media -e K -f ass -c
 AsrTools/
 ├── asr_gui.py          # GUI 主程序
 ├── cli.py              # 命令行工具
+├── build.py            # 自动化构建脚本
 ├── ffmpeg_manager.py   # FFmpeg 自动管理
 ├── bk_asr/             # ASR 引擎模块
 │   ├── BcutASR.py
@@ -108,15 +109,51 @@ AsrTools/
 
 ## 构建
 
-使用 PyInstaller 打包：
+### 使用构建脚本（推荐）
+
+项目提供了自动化构建脚本 `build.py`：
+
+```bash
+# 默认构建：GUI + CLI (目录版本)
+python build.py
+
+# 构建所有版本：GUI + CLI + CLI 单文件版本
+python build.py --cli-single
+
+# 仅构建 CLI 单文件版本（独立 exe，无依赖）
+python build.py --no-gui --no-cli --cli-single
+
+# 跳过清理，增量构建
+python build.py --no-clean
+```
+
+构建脚本参数说明：
+
+| 参数 | 说明 |
+|------|------|
+| `--no-gui` | 跳过 GUI 版本构建 |
+| `--no-cli` | 跳过 CLI 目录版本构建 |
+| `--cli-single` | 构建 CLI 单文件版本 |
+| `--no-clean` | 跳过清理之前的构建文件 |
+
+### 手动使用 PyInstaller
 
 ```bash
 # GUI 版本
 pyinstaller asr_gui.spec
 
-# CLI 版本
+# CLI 版本（目录版）
 pyinstaller asr_cli.spec
+
+# CLI 单文件版本
+pyinstaller --onefile --console --strip --name asr_cli_single cli.py
 ```
+
+### 构建产物
+
+- **GUI 版本**: `dist/asr_gui/` (目录版，包含 `asr_gui.exe` 和 `_internal/` 依赖)
+- **CLI 目录版**: `dist/asr_cli/` (目录版，包含 `asr_cli.exe` 和 `_internal/` 依赖)
+- **CLI 单文件版**: `dist/asr_cli_single.exe` (单文件 exe，可独立运行，推荐用于分发)
 
 ## 版本发布流程
 
