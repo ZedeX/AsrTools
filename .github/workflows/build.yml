@@ -6,6 +6,9 @@ on:
   release:
     types: [created]            # 当创建 Release 时触发
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
