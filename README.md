@@ -1,243 +1,62 @@
-# 🎤 AsrTools v1.3.0
-**AsrTools** 是一款基于多种开源和商业 ASR（自动语音识别）引擎的桌面 GUI 应用程序，旨在帮助用户轻松将音频文件转换为文本字幕。它支持批量处理、多线程并发，并提供多种实用功能，提升用户体验和工作效率。
+# AsrTools
 
-## 🌟 **特色功能**
+音视频转文字工具，支持多种 ASR 引擎。
 
-- 🚀 **无需复杂配置**：无需 GPU 和繁琐的本地配置，小白也能轻松使用。
-- 🖥️ **高颜值界面**：基于 **PyQt5** 和 **qfluentwidgets**，界面美观且用户友好。
-- ⚡ **效率超人**：多线程并发 + 批量处理，文字转换快如闪电。
-- 📄 **多格式支持**：支持生成 `.srt` 和 `.txt` 、`ass`字幕文件，满足不同需求。
-- 🧹 **智能清理**：一键清理已完成或跳过的任务，保持列表整洁。
-- ⏭️ **智能跳过**：自动跳过已存在输出文件的任务，避免重复处理。
-- 🔄 **错误重试**：支持对失败任务进行重新处理，提升成功率。
-- 📢 **完成通知**：全部任务处理完毕后显示持久化通知提醒用户。
-- 📋 **实时日志**：新增 LOG 菜单，实时查看处理日志，便于调试和监控。
-- 🔽 **FFmpeg 自动下载**：首次使用视频转换功能时自动下载 FFmpeg，无需手动配置！
-- 📦 **命令行工具**：新增 CLI 版本，支持脚本化批量处理。
+## 功能
 
-欢迎为项目给上一个 Star ⭐ 。
+- **GUI 界面**：图形化操作，支持批量处理
+- **命令行工具**：脚本化批量处理
+- **多引擎支持**：必剪、剪映、快手 ASR 接口
+- **多格式输出**：SRT、ASS、TXT 字幕格式
+- **视频支持**：自动转换视频为音频（FFmpeg 自动下载）
+- **多线程处理**：批量文件并行处理
 
-**主界面截图示例：**
+## 快速开始
 
-<img src="resources/main_window-1.1.0.png" width="80%" alt="主界面">
+### 使用预构建版本
 
+从 [Releases](https://github.com/ZedeX/AsrTools/releases) 下载对应系统的版本。
 
-### 🖥️ **快速上手**
-
-1. **启动应用**：运行下载的可执行文件或通过命令行启动 GUI 界面。
-2. **选择 ASR 引擎**：在下拉菜单中选择你需要使用的 ASR 引擎。
-3. **添加文件**：点击"选择文件"按钮或将文件/文件夹拖拽到指定区域。
-4. **开始处理**：点击"开始处理"按钮，程序将自动开始转换，并在完成后在原音频目录生成 `.srt` 或 `.txt` 字幕文件。（默认保持 3 个线程运行）
-
-### 💻 **命令行工具**
-
-新增 CLI 版本，支持通过命令行进行音视频转文字：
+### 从源码运行
 
 ```bash
-# 基本用法
-python cli.py video.mp4
+# 安装依赖
+pip install -r requirements.txt
 
-# 指定引擎和输出格式
-python cli.py audio.mp3 -e BcutASR -f txt
+# 运行 GUI
+python asr_gui.py
 
-# 指定输出文件并使用缓存
-python cli.py input.wav -o output.srt -c
+# 使用命令行
+python cli.py video.mp4 -e JianYingASR -f srt
 ```
 
-完整参数说明：
-- `-e, --engine`: ASR 引擎 (BcutASR, JianYingASR, KuaiShouASR) - 默认: JianYingASR
-- `-f, --format`: 输出格式 (srt, ass, txt) - 默认: srt
-- `-o, --output`: 输出文件路径 (可选)
-- `-c, --cache`: 使用缓存 (可选)
-- `-h, --help`: 显示帮助信息
+## 项目结构
 
-## 🛠️ **安装指南**
+```
+AsrTools/
+├── asr_gui.py          # GUI 主程序
+├── cli.py              # 命令行工具
+├── ffmpeg_manager.py   # FFmpeg 自动管理
+├── bk_asr/             # ASR 引擎模块
+│   ├── BcutASR.py
+│   ├── JianYingASR.py
+│   └── KuaiShouASR.py
+├── asr_gui.spec        # PyInstaller GUI 配置
+└── asr_cli.spec        # PyInstaller CLI 配置
+```
 
-###  **1. 从发布版本安装**
+## 构建
 
-我为 Windows 用户提供了打包好的[Release](https://github.com/WEIFENG2333/AsrTools/releases)版本，下载后解压即可直接使用，无需配置环境。
+使用 PyInstaller 打包：
 
-或者从网盘下载： [https://wwwm.lanzoue.com/iUJYZ2clk7xg](https://wwwm.lanzoue.com/iPKZV2eh5ina)
+```bash
+# GUI 版本
+pyinstaller asr_gui.spec
 
-运行解压后的 `AsrTools.exe`，即可启动 GUI 界面。
+# CLI 版本
+pyinstaller asr_cli.spec
+```
 
-**v1.3.0 更新说明**：现在 FFmpeg 会在首次使用视频转换功能时自动下载，无需手动配置！
+## 许可证
 
-
-###  **2. 从源码安装（开发者）**
-
-项目的依赖仅仅为 `requests`。
-
-如果您需要 GUI 界面，请额外安装 `PyQt5`, `qfluentwidgets`。
-
-如果您想从源码运行，请按照以下步骤操作：
-
-1. **克隆仓库并进入项目目录**
-
-    ```bash
-    git clone https://github.com/WEIFENG2333/AsrTools.git
-    cd AsrTools
-    ```
-
-2. **安装依赖并运行**
-
-    - **启动 GUI 界面**
-
-        ```bash
-        pip install -r requirements.txt
-        python asr_gui.py
-        ```
-
-    - **使用命令行工具**
-
-        ```bash
-        python cli.py --help
-        ```
----
-
-## 📦 **打包指南（生成可执行文件）**
-
-如果您想将项目打包成独立的可执行文件（.exe），可以使用 **PyInstaller**。
-
-1. **安装 PyInstaller**
-
-    ```bash
-    pip install pyinstaller
-    ```
-
-2. **打包应用（GUI 版本）**
-
-    ```bash
-    pyinstaller --onedir --windowed --noconfirm --noconsole --strip \
-    --hidden-import PyQt5.QtCore \
-    --hidden-import PyQt5.QtGui \
-    --hidden-import PyQt5.QtWidgets \
-    --hidden-import qfluentwidgets \
-    --hidden-import requests \
-    --hidden-import urllib3 \
-    --hidden-import chardet \
-    --hidden-import idna \
-    --hidden-import certifi \
-    --hidden-import _ssl \
-    --hidden-import ssl \
-    --hidden-import _hashlib \
-    --hidden-import _socket \
-    --hidden-import http.client \
-    --hidden-import urllib.request \
-    --hidden-import urllib.parse \
-    --hidden-import urllib.error \
-    --hidden-import _ctypes \
-    --exclude-module torch \
-    --exclude-module torchvision \
-    --exclude-module torchaudio \
-    --exclude-module pandas \
-    --exclude-module scipy \
-    --exclude-module yaml \
-    --exclude-module setuptools \
-    --exclude-module pywin32 \
-    --exclude-module Pythonwin \
-    --exclude-module markupsafe \
-    --exclude-module PIL \
-    --exclude-module dateutil \
-    --exclude-module pytz \
-    --exclude-module google \
-    asr_gui.py
-    ```
-
-3. **打包应用（CLI 版本）**
-
-    ```bash
-    pyinstaller --onedir --console --noconfirm --strip \
-    --hidden-import requests \
-    --hidden-import urllib3 \
-    --hidden-import chardet \
-    --hidden-import idna \
-    --hidden-import certifi \
-    --hidden-import _ssl \
-    --hidden-import ssl \
-    --hidden-import _hashlib \
-    --hidden-import _socket \
-    --hidden-import http.client \
-    --hidden-import urllib.request \
-    --hidden-import urllib.parse \
-    --hidden-import urllib.error \
-    --hidden-import _ctypes \
-    --exclude-module PyQt5 \
-    --exclude-module PyQt5.QtCore \
-    --exclude-module PyQt5.QtGui \
-    --exclude-module PyQt5.QtWidgets \
-    --exclude-module qfluentwidgets \
-    --exclude-module torch \
-    --exclude-module torchvision \
-    --exclude-module torchaudio \
-    --exclude-module pandas \
-    --exclude-module scipy \
-    --exclude-module yaml \
-    --exclude-module setuptools \
-    --exclude-module pywin32 \
-    --exclude-module Pythonwin \
-    --exclude-module markupsafe \
-    --exclude-module PIL \
-    --exclude-module dateutil \
-    --exclude-module pytz \
-    --exclude-module google \
-    --name asr_cli \
-    cli.py
-    ```
-
-    **注意**：打包后，需要将 `libcrypto-3.dll` 和 `libssl-3.dll` 复制到生成的可执行文件所在目录的 `_internal` 子目录中。
-
-    这个命令排除了常见的多余模块（如 torch、pandas、scipy 等），大幅减小打包大小。运行后检查 `dist/asr_gui/_internal` 目录，如果仍有不需要的模块，添加更多 `--exclude-module`。
-
-4. **FFmpeg 说明**
-
-    **v1.3.0 更新**：现在程序会自动检测和下载 FFmpeg！
-
-    - 如果系统 PATH 中已安装 FFmpeg，程序会自动使用它
-    - 如果未找到，首次使用视频转换功能时会提示自动下载
-    - 下载源：GitHub (BtbN/FFmpeg-Builds)
-    - 下载大小：约 80-100MB
-
-    如果您想手动提供 FFmpeg：
-    - 下载 ffmpeg（Windows 版本）：从 [ffmpeg.org](https://ffmpeg.org/download.html) 或 [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases) 获取 `ffmpeg.exe`
-    - 将 `ffmpeg.exe` 复制到程序目录中
-    - 或者，将 ffmpeg 的 bin 目录添加到系统 PATH
-
-5. **运行生成的可执行文件**
-
-    - **GUI 版本**：在 `dist/asr_gui/` 目录下找到 `asr_gui.exe`，双击运行
-    - **CLI 版本**：在 `dist/asr_cli/` 目录下找到 `asr_cli.exe`，在命令行中运行
-
-**注意**：
-- 使用 `--onedir` 生成的目录大小通常小于 `--onefile`，便于管理。
-- FFmpeg 现在会自动处理，无需手动配置！
-- 如果仍有问题，检查 exe 运行时的错误日志。
-
----
-
-## 日志
-
-- **（v1.3.0）新增 FFmpeg 自动下载和 CLI 工具**：
-  - 自动检测系统 PATH 中的 FFmpeg
-  - 首次使用视频转换时自动从 GitHub 下载 FFmpeg
-  - 新增命令行工具 (cli.py) 支持脚本化处理
-  - FFMPEG 调用不再弹出控制台窗口（Windows）
-  - 版本号更新至 1.3.0
-
-- **（v1.2.0）新增任务管理功能**：添加清理已完成任务按钮、智能跳过重复文件、错误任务重试、完成通知和实时日志查看，提升用户体验和效率。
-- **（v1.1.0）已经增加视频文件支持🎥**：支持直接导入视频文件，自动转换为音频进行处理，无需手动转换。
-
-## 📬 **联系与支持**
-
-- **Issues**：[提交问题](https://github.com/WEIFENG2333/AsrTools/issues)
-
-感谢您使用 **AsrTools**！🎉
-
-目前项目的相关调用和GUI页面的功能仍在不断完善中...
-
-希望这款工具能为您带来便利。😊
-
----
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=WEIFENG2333/AsrTools&type=Date)](https://star-history.com/#WEIFENG2333/AsrTools&Date)
+MIT License
